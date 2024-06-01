@@ -1,0 +1,109 @@
+#logs {
+  width:100%;
+  overflow:auto;
+  white-space:nowrap;
+  user-select: text;
+}
+
+.gitlogmsg {
+  color: #b29f2e;
+}
+
+.gt_header {
+  width: 100%;
+  
+  .title {
+    /* border: 1px solid gray; */
+    padding: 3px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    font-weight: bold;
+  }
+
+  .commands {
+    width: 98%;
+    padding: 3px;
+    height: 32px;
+    
+    span {
+      font-size: 26px;
+      float: right;
+    }
+  }
+  
+  .git_commands {
+    width: 98%;
+    padding: 3px;
+    height: 32px;
+    
+    span {
+      font-size: 26px;
+      float: right;
+    }
+  }
+}
+  
+.gt_files {
+
+  ul {
+    height: 400px;
+    max-height: 90%;
+    overflow-y: scroll;
+  }
+  
+  .staged {
+    .title {
+      background-color: #0b8d2a;
+    }
+  }
+  
+  .unstaged {
+    .title {
+      background-color: #5c89e9;
+    }
+  }
+  
+  .untracked {
+    .title {
+      background-color: #A77B0E;
+    }
+  }
+}
+
+.commit_message {
+  width: 100%;
+}
+
+.gt-item {
+  display: flex;
+  
+  .gt-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: scroll;
+
+    .gt-text {
+      font-size: 0.9rem;
+      overflow: scroll;
+      
+      &.new {
+        /* color: green; */
+      }
+      
+      &.deleted {
+        text-decoration : line-through;
+      }
+      
+      &.modified {
+        /* color: blue; */
+      }
+    }
+    
+    .gt-sub-text {
+      font-size: 0.7rem;
+      opacity: 0.6;
+    }
+  }
+}

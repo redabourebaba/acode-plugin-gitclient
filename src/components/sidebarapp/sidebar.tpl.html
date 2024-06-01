@@ -1,0 +1,144 @@
+<div class="sidebarmain">
+  <div class='g_header'>
+    SOURCE CONTROL
+  </div>
+  
+  <p>
+    <input class="commit_message" name="commit_message" type="text" placeholder="Message" />
+  </p>
+
+  <p>
+    <select name="git_command">
+      <option value="commit">Commit</option>
+      <option value="commit_amend">Commit (Amend)</option>
+      <option value="commit_push">Commit & Push</option>
+      <option value="commit_sync">Commit & Sync</option>
+      <option value="fetch">Fetch</option>
+      <option value="pull">Pull</option>
+      <option value="push">Push</option>
+      <option value="status">Status</option>
+    </select>
+    <input name="exec" type="button" value="Exec" />
+  </p>
+
+  <div class="wrap-staged">
+    <input id="staged" class="toggle" type="checkbox">
+    <label for="staged" class="lbl-staged lbl-toggle">Staged changes</label>
+    <div class="collapsible-content">
+      <div class="content-inner"></div>
+    </div>
+  </div>
+
+  <br />
+
+  <div class="wrap-changed">
+    <input id="changed" class="toggle" type="checkbox">
+    <label for="changed" class="lbl-changed lbl-toggle">Unstaged changes</label>
+    <div class="collapsible-content">
+      <div class="content-inner"></div>
+    </div>
+  </div>
+  
+  <p>
+    <select name="branches" class="branches"></select>
+    <input name="checkout" type="button" value="Checkout" />
+  </p>
+  
+  <!-- <input id="git_refresh" name="refresh" type="button" value="Refresh" /> -->
+  
+  <style>
+
+  /* body {
+    background-color: black;
+  } */
+  .sidebarmain {
+    /* background-color: black; */
+    height: 100%;
+  }
+  .g_header {
+    /* border: 1px solid gray; */
+    padding: 3px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    font-weight: bold;
+  }
+
+  input[type='checkbox'] {
+    display: none;
+  }
+
+  .lbl-toggle {
+    display: block;
+    font-family: monospace;
+    font-size: 18dp;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 0.5rem;
+    border-radius: 7px;
+    transition: all 0.25s ease-out;
+  }
+
+  .lbl-staged {
+    color: #0b8d2a;
+    background: #f1f1f1;
+  }
+
+  .lbl-changed {
+    color: #A77B0E;
+    background: #f1f1f1;
+  }
+
+  .lbl-toggle:hover {
+    /* color: #7C5A0B; */
+  }
+
+  .lbl-toggle::before {
+    content: ' ';
+    display: inline-block;
+
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 5px solid currentColor;
+
+    vertical-align: middle;
+    margin-right: .7rem;
+    transform: translateY(-2px);
+
+    transition: transform .2s ease-out;
+  }
+
+  .collapsible-content .content-inner {
+    background: #fdfcfa;
+    border-bottom: 1px solid rgba(250, 224, 66, .45);
+
+    border-bottom-left-radius: 7px;
+    border-bottom-right-radius: 7px;
+    padding: .1rem 0.5rem;
+  }
+
+  .collapsible-content {
+    max-height: 0px;
+    overflow: hidden;
+    color: blue;
+    transition: max-height .25s ease-in-out;
+  }
+
+  .toggle:checked + .lbl-toggle + .collapsible-content {
+    max-height: 100vh;
+  }
+
+  .toggle:checked + .lbl-toggle::before {
+    transform: rotate(90deg) translateX(-3px);
+  }
+
+  .toggle:checked + .lbl-toggle {
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  .commit_message {
+    width: 100%;
+  }
+</style>
+</div>

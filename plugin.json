@@ -1,0 +1,17 @@
+{
+  "id": "acode.plugin.gitclient",
+  "name": "Git Client",
+  "main": "dist/main.js",
+  "type": "free",
+  "version": "1.0.0",
+  "readme": "readme.md",
+  "icon": "icon.png",
+  "files": [],
+  "minVersionCode" : 290,
+  "price": 0,
+  "author": {
+    "name": "Reda Bourebaba",
+    "email": "bourebaba.reda@gmail.com",
+    "github": ""
+  }
+}
