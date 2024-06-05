@@ -158,13 +158,31 @@ export async function gitCommit(_fs, _dir, _msg, _auth_name, _auth_email) {
   });
 }
 
-export async function gitPush(_fs, _dir, _http) {
+export async function gitPush(_fs, _dir, _http, _onAuth, _onAuthSuccess, _onAuthFailure) {
   return await git.push({
     fs: _fs,
     dir: _dir,
     http: _http,
-    remote: 'origin',
     corsProxy: 'https://cors.isomorphic-git.org',
+    remote: 'origin',
+    onAuth: _onAuth,
+    onAuthSuccess: _onAuthSuccess,
+    onAuthFailure: _onAuthFailure
+  });
+}
+
+export async function gitFetch(_fs, _dir, _http, _onAuth, _onAuthSuccess, _onAuthFailure) {
+  return await git.fetch({
+    fs: _fs,
+    dir: _dir,
+    http: _http,
+    corsProxy: 'https://cors.isomorphic-git.org',
+    remote: 'origin',
+    tags: false,
+    depth: 1,
+    onAuth: _onAuth,
+    onAuthSuccess: _onAuthSuccess,
+    onAuthFailure: _onAuthFailure
   });
 }
 

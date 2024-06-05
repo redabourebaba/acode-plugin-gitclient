@@ -35,6 +35,10 @@ let $untrackedItemsSelected = [];
 
 let $selectActionList = null;
 
+const confirm = acode.require('confirm');
+const alert = acode.require('alert');
+const multiPrompt = acode.require('multiPrompt');
+
 // const $header = <div className='header'>
 //   <span className='title'>Changed</span>
 //   <input type='search' name='search-ext' placeholder='Search' />
@@ -49,7 +53,7 @@ const $header = <div className="gt_header">
     <select id="branches" name="branches" className="branches"></select>
     <span id="git_refresh_span" className="icon refresh"></span>
   </div>
-  <input className="commit_message" name="commit_message" type="text" placeholder="Message"></input>
+  <input id="commit_message" className="commit_message" name="commit_message" type="text" placeholder="Message"></input>
   <div id="git_commands" className="git_commands">
     <select id="git_command" className="git_command" name="git_command">
       <option value="commit">Commit</option>
@@ -71,6 +75,122 @@ const $header = <div className="gt_header">
 
 const $files = <div className='gt_files'>
 </div>;
+
+const onAuthSuccess = async function(url, auth){
+  if (auth 
+    && (!auth.state || auth.state !== 'cache')
+    && await confirm('Confirm', 'Remember password?', true)) {
+    savePassword(url, auth)
+  }
+};
+
+const onAuthFailure = async function(url, auth){
+  forgetSavedPassword(url)
+  if (await confirm('Confirm', 'Access was denied. Try again?', true)) {
+    return await promptAuthInfo(url)
+  } else {
+    return { cancel: true }
+  }
+};
+
+const onAuth = async function(url){
+  try {
+    let auth = await lookupSavedPassword(url);
+  
+    if (auth) {
+      // alert('Alert', 'onAuth look : **' + JSON.stringify(auth) + '**');
+      auth.state = 'cache';
+      return auth
+    }
+  
+    if(await confirm('Confirm', 'This repo is password protected. Ready to enter a username & password?', true)){
+      auth = await promptAuthInfo(url);
+      // alert('Alert', 'onAuth prompt : ' + JSON.stringify(auth));
+      auth.state = 'new'
+      return auth;
+    } else {
+      return { cancel: true }
+    }
+  } catch(err){
+    alert('Alert', 'Authentication error : ' + err);
+    return { cancel: true }
+  }
+};
+
+async function savePassword(url, auth){
+  localStorage.setItem(url, JSON.stringify(auth));
+}
+
+async function forgetSavedPassword(url){
+  localStorage.removeItem(url);
+}
+
+async function lookupSavedPassword(url, auth){
+  try {
+    const data = localStorage.getItem(url);
+    if(data) return JSON.parse(data);
+    else return null;
+  } catch(err){
+    return null;
+  }
+}
+
+async function promptAuthInfo(url){
+  let prompt = await multiPrompt(
+      'Enter authentication infos',
+      [
+        [
+          { type: 'text', id: 'user_name', placeholder: 'User name', required: false},
+          { type: 'text', id: 'user_password', placeholder: 'User password', required: false}
+        ],
+        [
+          { type: 'text', id: 'token', placeholder: 'Token', required: false},
+        ]
+      ],
+      null
+    );
+    
+    let userName = prompt['user_name'];
+    let userPassword = prompt['user_password'];
+    let token = prompt['token'];
+
+    let auth = {
+      username: userName,
+      password: userPassword
+    }
+    
+    if(token !== null){
+      let platformAuth = getPlatformAuth(url, token);
+      if(platformAuth !== null){
+        auth = platformAuth;
+      } else {
+        auth = {
+          username: token
+        }
+      }
+    }
+    
+    return auth
+}
+
+function getPlatformAuth(url, token){
+  if(url.includes('github')) 
+    return {
+      username: 'git',
+      password: token
+    };
+  if(url.includes('gitlab')) 
+    return {
+      username: 'gitlab-ci-token',
+      password: token
+    };
+  if(url.includes('bitbucket'))
+    return {
+      username: token
+    };
+  
+  return null;
+}
 
 export class SideBarManager {
   constructor(_plug) {
@@ -236,11 +356,10 @@ export class SideBarManager {
     
     this.branchesSel = $header.get('#branches');
     this.branchesSel.addEventListener("change", function(e) {
-      
       _self.checkout(e.target.value);
-      
     }, false);
     
+    this.commitMess = $header.get('#commit_message');
     this.gitCommand = $header.get('#git_command');
     this.gitExec = $header.get('#git_exec');
     this.gitExec.addEventListener("click", function(e) {
@@ -299,27 +418,22 @@ export class SideBarManager {
   }
   
   async commit(){
-    const confirm = acode.require('confirm');
-
-    let confirmation = await confirm('Confirm', `Commit following files ? <br/><ul><li>${$stagedItems.map((e)=>e[0]).join('</li><li>')}</li></ul>`, true);
-    if (confirmation) {
-      
+    if(await confirm('Confirm', `Commit following files ? <br/><ul><li>${$stagedItems.map((e)=>e[0]).join('</li><li>')}</li></ul>`, true)) {
       try{
         const gitDir = this.getCurrentGitdir();
         const filesystem = this.getFilesystem();
   
+        let message = this.commitMess.value;
         let authorName = await gitGetConfig(filesystem, gitDir, 'user.name');
         let authorEmail = await gitGetConfig(filesystem, gitDir, 'user.email');
         
         if(!authorName) authorName = '';
         if(!authorEmail) authorEmail = '';
         
-        const multiPrompt = acode.require('multiPrompt');
-        
         await multiPrompt(
           'Enter commit infos',
           [
-            { type: 'text', id: 'msg', placeholder: 'Commit message', required: true},
+            { type: 'text', id: 'msg', placeholder: 'Commit message', value: message, required: true},
             [
               { type: 'text', id: 'author_name', placeholder: 'Author name', value: authorName, required: true},
               { type: 'text', id: 'author_email', placeholder: 'Author email', value: authorEmail, required: true}
@@ -359,11 +473,8 @@ export class SideBarManager {
   
   async add(){
     let toAddOrRemove = $unstagedItemsSelected.concat($untrackedItemsSelected);
-    
-    const confirm = acode.require('confirm');
 
-    let confirmation = await confirm('Confirm', `Commit following files ? <br/><ul><li>${toAddOrRemove.map((e)=>e[0]).join('</li><li>')}</li></ul>`, true);
-    if (confirmation) {
+    if(await confirm('Confirm', `Commit following files ? <br/><ul><li>${toAddOrRemove.map((e)=>e[0]).join('</li><li>')}</li></ul>`, true)) {
       this.addOrRemoveItems(toAddOrRemove);
     }
   }
@@ -382,26 +493,19 @@ export class SideBarManager {
   }
   
   async push(){
-    const confirm = acode.require('confirm');
-
-    let confirmation = await confirm('Confirm', `Do you want to push commits ?`, true);
-    if (confirmation) {
-      
+    if(await confirm('Confirm', `Do you want to push commits ?`, true)){
       try{
         const gitDir = this.getCurrentGitdir();
         const filesystem = this.getFilesystem();
         this.pushCommits(gitDir, filesystem);
       } catch(err){
-        this.plug.showMsg("Error : " + err);
+        this.plug.showMsg("Push error : " + err);
       }
     }
   }
   
   async checkout(ref){
-    const confirm = acode.require('confirm');
-
-    let confirmation = await confirm('Confirm', `Checkout ${ref} ?`);
-    if (confirmation) {
+    if(await confirm('Confirm', `Checkout ${ref} ?`)){
       this.checkoutRef(ref);
     } else {
       let currentBranch = await this.getCurrentBranch();
@@ -643,15 +747,13 @@ export class SideBarManager {
   
   async pushCommits(gitDir, filesystem) {
     try {
-      this.showLoader("Commit", "Pushing ...");
-
-      await gitPush(filesystem, gitDir, http);
-
-      this.hideLoader();
+      this.showLoader("Push", "Processing ...");
+      const result = await gitPush(filesystem, gitDir, http, onAuth, onAuthSuccess, onAuthFailure);
       this.plug.showMsg('Commits pushed');
     } catch(err){
+      this.plug.showMsg("Push commits error : " + err);
+    } finally {
       this.hideLoader();
-      this.plug.showMsg("Error : " + err);
     }
   }
   

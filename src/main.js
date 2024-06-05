@@ -19,6 +19,8 @@ import {
   CommandsManager
 } from './manager/commandsmanager.js'
 
+const alert = acode.require('alert');
+
 export class GitClientAcodePlugin {
 
   appName = 'git-client-app';
@@ -115,7 +117,6 @@ export class GitClientAcodePlugin {
   }
 
   showMsg(msg) {
-    const alert = acode.require('alert');
     alert('Alert', msg);
   }
 
