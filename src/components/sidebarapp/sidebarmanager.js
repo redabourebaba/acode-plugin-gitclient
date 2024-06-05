@@ -418,44 +418,57 @@ export class SideBarManager {
   }
   
   async commit(){
-    if(await confirm('Confirm', `Commit following files ? <br/><ul><li>${$stagedItems.map((e)=>e[0]).join('</li><li>')}</li></ul>`, true)) {
-      try{
-        const gitDir = this.getCurrentGitdir();
-        const filesystem = this.getFilesystem();
-  
-        let message = this.commitMess.value;
-        let authorName = await gitGetConfig(filesystem, gitDir, 'user.name');
-        let authorEmail = await gitGetConfig(filesystem, gitDir, 'user.email');
-        
-        if(!authorName) authorName = '';
-        if(!authorEmail) authorEmail = '';
-        
-        await multiPrompt(
-          'Enter commit infos',
-          [
-            { type: 'text', id: 'msg', placeholder: 'Commit message', value: message, required: true},
+    if($stagedItems.length > 0){
+      if(await confirm('Confirm', `Commit following files ? <br/><ul><li>${$stagedItems.map((e)=>e[0]).join('</li><li>')}</li></ul>`, true)) {
+        try{
+          const gitDir = this.getCurrentGitdir();
+          const filesystem = this.getFilesystem();
+    
+          let message = this.commitMess.value;
+          let authorName = await gitGetConfig(filesystem, gitDir, 'user.name');
+          let authorEmail = await gitGetConfig(filesystem, gitDir, 'user.email');
+          
+          if(!authorName) authorName = '';
+          if(!authorEmail) authorEmail = '';
+          
+          multiPrompt(
+            'Enter commit infos',
             [
-              { type: 'text', id: 'author_name', placeholder: 'Author name', value: authorName, required: true},
-              { type: 'text', id: 'author_email', placeholder: 'Author email', value: authorEmail, required: true}
-            ]
-          ],
-          'Commit message : explain why this commit'
-        ).then(
-          prompt => {
-              authorName = prompt['author_name'];
-              authorEmail = prompt['author_email'];
-              let commitMessage = prompt['msg'];
-              // this.plug.showMsg(`author : ${authorName}/${authorEmail}, message : ${commitMessage}`)
-            
-              this.commitStagedItems(gitDir, filesystem, commitMessage, authorName, authorEmail);
-          }
-          // , error => {
-          //   this.plug.showMsg('Cancelled');
-          // }
-        );
-      } catch(err){
-        this.plug.showMsg("Error : " + err);
+              { type: 'text', id: 'msg', placeholder: 'Commit message', value: message, required: true},
+              [
+                { type: 'text', id: 'author_name', placeholder: 'Author name', value: authorName, required: true},
+                { type: 'text', id: 'author_email', placeholder: 'Author email', value: authorEmail, required: true}
+              ]
+            ],
+            'Commit message : explain why this commit'
+          ).then(
+            prompt => {
+                try {
+                  let newAuthorName = prompt['author_name'];
+                  let newAuthorEmail = prompt['author_email'];
+                  let commitMessage = prompt['msg'];
+                  
+                  if(authorName !== newAuthorName) {
+                    gitSetConfig(filesystem, gitDir, 'user.name', newAuthorName);
+                  }
+                  
+                  if(authorEmail !== newAuthorEmail) {
+                    gitSetConfig(filesystem, gitDir, 'user.email', newAuthorEmail);
+                  }
+                  
+                  this.commitStagedItems(gitDir, filesystem, commitMessage, newAuthorName, newAuthorEmail);
+                } catch(err){
+                  this.plug.showMsg("Commit prompt error : " + err);
+                }
+            }
+          );
+        } catch(err){
+          this.plug.showMsg("Commit error : " + err);
+        }
       }
+    }
+    else {
+      this.plug.showMsg("Nothing to commit. Please add files before.");
     }
   }
   
