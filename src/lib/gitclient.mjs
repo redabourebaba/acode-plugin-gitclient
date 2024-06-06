@@ -1,5 +1,5 @@
-import git from './isogit/index_fixed.mjs'
-// import git from './isogit/index.mjs'
+// import git from './isogit/index_fixed.mjs'
+import git from './isogit/index.mjs'
 // import git from 'isomorphic-git'
 
 function logerror(msg){
@@ -165,6 +165,20 @@ export async function gitPush(_fs, _dir, _http, _onAuth, _onAuthSuccess, _onAuth
     http: _http,
     corsProxy: 'https://cors.isomorphic-git.org',
     remote: 'origin',
+    onAuth: _onAuth,
+    onAuthSuccess: _onAuthSuccess,
+    onAuthFailure: _onAuthFailure
+  });
+}
+
+export async function gitPull(_fs, _dir, _http, _ref, _onAuth, _onAuthSuccess, _onAuthFailure) {
+  return await git.pull({
+    fs: _fs,
+    dir: _dir,
+    http: _http,
+    corsProxy: 'https://cors.isomorphic-git.org',
+    ref: _ref,
+    singleBranch: true,
     onAuth: _onAuth,
     onAuthSuccess: _onAuthSuccess,
     onAuthFailure: _onAuthFailure

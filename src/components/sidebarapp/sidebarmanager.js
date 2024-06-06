@@ -10,7 +10,9 @@ import {
   gitCommit,
   gitGetConfig,
   gitSetConfig,
-  gitPush
+  gitPush,
+  gitPull,
+  gitLogs
 } from '../../lib/gitclient.mjs';
 
 import collapsableList from '../collapsableList';
@@ -65,7 +67,7 @@ const $header = <div className="gt_header">
       <option value="fetch">Fetch</option>
       <option value="pull">Pull</option>
       <option value="push">Push</option>
-      <option value="status">Status</option>
+      <option value="log">Log</option>
     </select>
     <span id="git_exec" className="git_exec icon check"></span>
   </div>
@@ -404,6 +406,10 @@ export class SideBarManager {
     if('push' === command){
       this.push();
     }
+    
+    if('log' === command){
+      this.log();
+    }
   }
 
   async removeSidebarApp() {
@@ -417,8 +423,19 @@ export class SideBarManager {
     this.setChangedFiles();
   }
   
-  async commit(){
-    if($stagedItems.length > 0){
+  async log() {
+    try{
+      const gitDir = this.getCurrentGitdir();
+      const filesystem = this.getFilesystem();
+      
+      this.gitLog(gitDir, filesystem);
+    } catch(err){
+      this.plug.showMsg("Status error : " + err);
+    }
+  }
+  
+  async commit() {
+    if($stagedItems.length > 0) {
       if(await confirm('Confirm', `Commit following files ? <br/><ul><li>${$stagedItems.map((e)=>e[0]).join('</li><li>')}</li></ul>`, true)) {
         try{
           const gitDir = this.getCurrentGitdir();
@@ -502,7 +519,13 @@ export class SideBarManager {
   }
   
   async pull(){
-    this.plug.showMsg('pull');
+    try{
+      const gitDir = this.getCurrentGitdir();
+      const filesystem = this.getFilesystem();
+      this.pullCurrentBranch(gitDir, filesystem);
+    } catch(err){
+      this.plug.showMsg("Pull error : " + err);
+    }
   }
   
   async push(){
@@ -743,6 +766,36 @@ export class SideBarManager {
     }
   }
   
+  async gitLog(gitDir, filesystem) {
+    this.plug.showTracePage("Git repo logs");
+    
+    const logs = await gitLogs(filesystem, gitDir);
+    if (logs) {
+      logs.forEach((el) => {
+        this.showGitLog(el);
+      });
+    } else {
+      this.plug.logmsg('No logs found');
+    }
+  }
+  
+  async showGitLog(el) {
+
+    const date = new Date(el.commit.author.timestamp);
+
+    const msg = <div>
+      <span className='gitlogmsg'>commit&nbsp;{el.oid}</span>
+      <br />
+      <span>Author:&nbsp;{el.commit.author.name}&lt;{el.commit.author.email}&gt;</span>
+      <br />
+      <span>Date:&nbsp;&nbsp;&nbsp;{date.toLocaleString()}</span>
+      <br />
+      <br />
+      <span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{el.commit.message}</span>
+    </div>;
+    this.plug.logmsgformat(msg);
+  }
+  
   async commitStagedItems(gitDir, filesystem, msg, author_name, author_email) {
     try {
       this.showLoader("Commit", "Commit files");
@@ -758,18 +811,31 @@ export class SideBarManager {
     }
   }
   
+  
   async pushCommits(gitDir, filesystem) {
     try {
       this.showLoader("Push", "Processing ...");
       const result = await gitPush(filesystem, gitDir, http, onAuth, onAuthSuccess, onAuthFailure);
-      this.plug.showMsg('Commits pushed');
+      this.plug.showMsg('Push processed : ' + JSON.stringify(result));
     } catch(err){
-      this.plug.showMsg("Push commits error : " + err);
+      this.plug.showMsg("Push error : " + err);
     } finally {
       this.hideLoader();
     }
   }
   
+  async pullCurrentBranch(gitDir, filesystem) {
+    try {
+      this.showLoader("Pull", "Processing ...");
+      let currentBranch = await this.getCurrentBranch();
+      await gitPull(filesystem, gitDir, http, currentBranch, onAuth, onAuthSuccess, onAuthFailure);
+      this.plug.showMsg('Pull processed');
+    } catch(err){
+      this.plug.showMsg("Pull error : " + err);
+    } finally {
+      this.hideLoader();
+    }
+  }
   
   async addOrRemoveItems(items) {
     try {

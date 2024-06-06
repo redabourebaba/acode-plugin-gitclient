@@ -85,9 +85,14 @@ export class GitClientAcodePlugin {
   showTracePage(title) {
     this.$page.settitle(title);
     
-    const logconsole = <div id="logs"/>
-    this.$page.append(logconsole);
-    this.$page.logs = logconsole;
+    let logs = this.$page.get('#logs');
+    
+    if(!logs) {
+      logs = <div id="logs"/>;
+      this.$page.append(logs);
+    } else {
+      logs.replaceChildren();
+    }
 
     const _self = this;
     const saveBtn =
@@ -129,22 +134,22 @@ export class GitClientAcodePlugin {
     const msgtag = tag("div", {
       textContent: msg,
     });
-    if (this.$page.logs) {
-      this.$page.logs.appendChild(msgtag);
-      this.$page.logs.appendChild(tag('br'));
-    } else {
-      this.$page.appendBody(msgtag);
-      this.$page.appendBody(tag('br'));
+    
+    let logs = this.$page.get('#logs');
+    
+    if (logs) {
+      logs.append(msgtag);
+      logs.append(tag('br'));
     }
   }
 
   showLogFormat(msgformat) {
-    if (this.$page.logs) {
-      this.$page.logs.appendChild(msgformat);
-      this.$page.logs.appendChild(tag('br'));
-    } else {
-      this.$page.appendBody(msgformat);
-      this.$page.appendBody(tag('br'));
+    
+    let logs = this.$page.get('#logs');
+    
+    if (logs) {
+      logs.append(msgformat);
+      logs.append(tag('br'));
     }
   }
 
