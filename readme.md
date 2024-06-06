@@ -7,3 +7,5 @@ Read acode plugin [documentation](https://acode.foxdebug.com/plugin-docs) to dev
 # how to build
 
 sh termux-build.sh
+
+# test pull
