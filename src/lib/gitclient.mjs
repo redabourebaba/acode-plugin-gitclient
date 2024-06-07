@@ -185,14 +185,15 @@ export async function gitPull(_fs, _dir, _http, _ref, _onAuth, _onAuthSuccess, _
   });
 }
 
-export async function gitFetch(_fs, _dir, _http, _onAuth, _onAuthSuccess, _onAuthFailure) {
+export async function gitFetch(_fs, _dir, _http, _ref, _onAuth, _onAuthSuccess, _onAuthFailure) {
   return await git.fetch({
     fs: _fs,
     dir: _dir,
     http: _http,
     corsProxy: 'https://cors.isomorphic-git.org',
-    remote: 'origin',
+    ref: _ref,
     tags: false,
+    singleBranch: true,
     depth: 1,
     onAuth: _onAuth,
     onAuthSuccess: _onAuthSuccess,

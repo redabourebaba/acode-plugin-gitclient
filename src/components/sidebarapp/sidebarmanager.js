@@ -12,7 +12,8 @@ import {
   gitSetConfig,
   gitPush,
   gitPull,
-  gitLogs
+  gitLogs,
+  gitFetch
 } from '../../lib/gitclient.mjs';
 
 import collapsableList from '../collapsableList';
@@ -515,7 +516,13 @@ export class SideBarManager {
   }
   
   async fetch(){
-    this.plug.showMsg('fetch');
+    try{
+      const gitDir = this.getCurrentGitdir();
+      const filesystem = this.getFilesystem();
+      this.fetchCurrentBranch(gitDir, filesystem);
+    } catch(err){
+      this.plug.showMsg("Pull error : " + err);
+    }
   }
   
   async pull(){
@@ -642,11 +649,11 @@ export class SideBarManager {
       <span className='gt-sub-text'>{status}</span>
     </div>;
 
-    $el.appendChild($content);
-    $el.appendChild($checkbox);
+    $el.append($content);
+    $el.append($checkbox);
     
     $content.addEventListener('click', (e) => {
-      _self.plug.showMsg('content');
+      _self.showDiff(filepath);
     });
     
     $checkbox.onclick = (e) => {
@@ -664,6 +671,11 @@ export class SideBarManager {
     };
 
     return $el;
+  }
+  
+  async showDiff(filepath){
+    // _self.plug.showMsg('content');
+    
   }
   
   async updateGitCommandList(){
@@ -814,7 +826,8 @@ export class SideBarManager {
   
   async pushCommits(gitDir, filesystem) {
     try {
-      this.showLoader("Push", "Processing ...");
+      let currentBranch = await this.getCurrentBranch();
+      this.showLoader("Push", "Processing " + currentBranch + " ...");
       const result = await gitPush(filesystem, gitDir, http, onAuth, onAuthSuccess, onAuthFailure);
       this.plug.showMsg('Push processed : ' + JSON.stringify(result));
     } catch(err){
@@ -826,12 +839,25 @@ export class SideBarManager {
   
   async pullCurrentBranch(gitDir, filesystem) {
     try {
-      this.showLoader("Pull", "Processing ...");
       let currentBranch = await this.getCurrentBranch();
+      this.showLoader("Pull", "Processing " + currentBranch + " ...");
       await gitPull(filesystem, gitDir, http, currentBranch, onAuth, onAuthSuccess, onAuthFailure);
       this.plug.showMsg('Pull processed');
     } catch(err){
       this.plug.showMsg("Pull error : " + err);
+    } finally {
+      this.hideLoader();
+    }
+  }
+
+  async fetchCurrentBranch(gitDir, filesystem) {
+    try {
+      let currentBranch = await this.getCurrentBranch();
+      this.showLoader("Fetch", "Processing " + currentBranch + " ...");
+      await gitFetch(filesystem, gitDir, http, currentBranch, onAuth, onAuthSuccess, onAuthFailure);
+      this.plug.showMsg('Fetch processed');
+    } catch(err){
+      this.plug.showMsg("Fetch error : " + err);
     } finally {
       this.hideLoader();
     }
