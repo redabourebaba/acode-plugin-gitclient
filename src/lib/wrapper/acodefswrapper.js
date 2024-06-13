@@ -14,7 +14,7 @@ export default class FsWrapper {
   }
 
   loginfo(msg) {
-    this.logger.info('FsWrapper ' + msg);
+    // this.logger.info('FsWrapper ' + msg);
   }
 
   logwarn(msg) {

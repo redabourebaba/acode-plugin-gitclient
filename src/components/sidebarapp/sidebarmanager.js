@@ -13,13 +13,21 @@ import {
   gitPush,
   gitPull,
   gitLogs,
-  gitFetch
+  gitFetch,
+  gitResolveRef,
+  gitReadBlob
 } from '../../lib/gitclient.mjs';
 
+import {
+  arrayToString
+} from '../../lib/utils/utils.js';
+
+// import git from '../../lib/isogit/index.mjs'
 import collapsableList from '../collapsableList';
 import tile from '../tile';
 import Checkbox from '../checkbox';
 import http from 'isomorphic-git/http/web/index.js'
+// import AceDiff from '../../lib/acediff/index.js';
 
 /** @type {HTMLElement} */
 let $container = null;
@@ -673,11 +681,6 @@ export class SideBarManager {
     return $el;
   }
   
-  async showDiff(filepath){
-    // _self.plug.showMsg('content');
-    
-  }
-  
   async updateGitCommandList(){
     if($unstagedItemsSelected.length > 0 || $untrackedItemsSelected.length > 0){
       this.gitCommand.value = 'add';
@@ -823,6 +826,45 @@ export class SideBarManager {
     }
   }
   
+  async showDiff(filepath){
+    // _self.plug.showMsg('content');
+    
+    try {
+      const diffPage = this.plug.showDiffPage("Diff for " + filepath);
+      
+      const filesystem = this.getFilesystem();
+      const gitDir = this.getCurrentGitdir();
+      
+      const currentBranch = await this.getCurrentBranch(filesystem, gitDir);
+      
+      // Get new content of file
+      let path = join(gitDir, filepath);
+      let content = await filesystem.readFile(path);
+      let data = null;
+      if(content instanceof Buffer) data = arrayToString(content);
+      else data = content;
+
+      // Get the contents of the file in current branch
+      let commitOid = await gitResolveRef(filesystem, gitDir, currentBranch)
+      let { blob } = await gitReadBlob(filesystem, gitDir, commitOid, filepath);
+      let oldData = Buffer.from(blob).toString('utf8');
+      
+      let AceDiff = require('../../lib/acediff/index');
+      
+      const differ = new AceDiff({
+        element: diffPage,
+        left: {
+          content: oldData,
+        },
+        right: {
+          content: data,
+        },
+      });
+
+    } catch(err){
+      this.plug.showMsg("showDiff error " + err);
+    }
+  }
   
   async pushCommits(gitDir, filesystem) {
     try {
@@ -1062,4 +1104,48 @@ export class SideBarManager {
     $el.style.maxHeight = calcHeight;
     $el.style.height = calcHeight;
   }
+}
+
+function join(...parts) {
+  
+  let result = parts.map(normalizePath).join('/');
+  result = normalizePath(result);
+  
+  return result;
+}
+
+const memo = new Map();
+function normalizePath(path) {
+  
+  let normalizedPath = memo.get(path);
+  if (!normalizedPath) {
+    normalizedPath = normalizePathInternal(path);
+    memo.set(path, normalizedPath);
+  }
+  
+  return normalizedPath
+}
+
+function normalizePathInternal(path) {
+  
+  path = path
+    .split('/./')
+    .join('/'); // Replace '/./' with '/'
+
+  // .replace(/\/{2,}/g, '/'); // Replace consecutive '/'
+
+  if(typeof window === 'undefined' || !window.acode){
+    path = path.replace(/\/{2,}/g, '/'); // Replace consecutive '/'
+  }
+
+  if (path === '/.') return '/' // if path === '/.' return '/'
+  if (path === './') return '.' // if path === './' return '.'
+
+  if (path.startsWith('./')) path = path.slice(2); // Remove leading './'
+  if (path.endsWith('/.')) path = path.slice(0, -2); // Remove trailing '/.'
+  if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1); // Remove trailing '/'
+
+  if (path === '') return '.' // if path === '' return '.'
+
+  return path
 }

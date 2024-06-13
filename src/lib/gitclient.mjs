@@ -227,3 +227,20 @@ export async function gitGetConfig(_fs, _dir, _path) {
     path: _path
   });
 }
+
+export async function gitResolveRef(_fs, _dir, _ref) {
+  return await git.resolveRef({
+    fs: _fs,
+    dir: _dir,
+    ref: _ref
+  });
+}
+
+export async function gitReadBlob(_fs, _dir, _oid, _path) {
+  return await git.readBlob({
+    fs : _fs,
+    dir: _dir,
+    oid: _oid,
+    filepath: _path
+  });
+}

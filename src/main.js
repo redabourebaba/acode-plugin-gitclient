@@ -1,5 +1,6 @@
 import plugin from '../plugin.json';
 import style from "./style.scss";
+import acestyle from './lib/acediff/styles/ace-diff.scss';
 // import logconsole from "./template/logconsole.tpl.html";
 import FsWrapper from './lib/wrapper/acodefswrapper.js'
 
@@ -34,6 +35,10 @@ export class GitClientAcodePlugin {
     this.$style = tag("style", {
       textContent: style,
     });
+    
+    this.$acestyle = tag("style", {
+      textContent: acestyle,
+    });
 
     await this.defineLogger();
     
@@ -41,6 +46,7 @@ export class GitClientAcodePlugin {
     this.sideBarManager = new SideBarManager(this);
     this.commandsManager = new CommandsManager(this);
     document.head.append(this.$style);
+    document.head.append(this.$acestyle);
 
     await this.sideBarManager.init();
     await this.commandsManager.init();
@@ -85,40 +91,82 @@ export class GitClientAcodePlugin {
   showTracePage(title) {
     this.$page.settitle(title);
     
-    let logs = this.$page.get('#logs');
+    // clear logs element
+    let diff = this.$page.get('#diff');
+    if(diff) {
+      // diff.replaceChildren();
+      this.$page.remove(diff);
+    }
     
+    const _self = this;
+    this.addToolbar((e) => {
+      _self.showMsg("click")
+      // _self.saveLogsToFile();
+      // _self.saveLogsToFile();
+    });
+    
+    let logs = this.$page.get('#logs');
     if(!logs) {
       logs = <div id="logs"/>;
       this.$page.append(logs);
     } else {
       logs.replaceChildren();
     }
-
-    const _self = this;
-    const saveBtn =
-    <span
-      className='icon save'
-      onclick={() => this.saveLogsToFile.call(this)}>
-    </span>;
     
-    saveBtn.addEventListener("click", function(e) {
-      _self.saveLogsToFile();
-    }, false);
-
-    // this.saveBtn = this.$page.querySelector('.save');
-
-    // if (this.saveBtn === undefined) {
-    this.$page.header.append(saveBtn);
-    // }
-
-    // var editor = ace.edit(this.$page.logs, {
-    //   mode: "ace/mode/javascript",
-    //   selectionStyle: "text"
-    // })
-    // editor.setTheme("ace/theme/monokai");
-    // editor.session.setMode("ace/mode/javascript");
-
     this.$page.show();
+  }
+  
+  showDiffPage(title) {
+    this.$page.settitle(title);
+    
+    // clear logs element
+    let logs = this.$page.get('#logs');
+    if(logs) {
+      // logs.replaceChildren();
+      this.$page.remove(logs);
+    }
+    
+    const _self = this;
+    this.addToolbar((e) => {
+      // _self.saveLogsToFile();
+      _self.showMsg("click")
+    });
+    
+    let diff = this.$page.get('#diff');
+    if(!diff) {
+      diff = <div id="diff"/>;
+      this.$page.append(diff);
+    } else {
+      diff.replaceChildren();
+    }
+    
+    this.$page.show();
+    
+    return diff;
+  }
+  
+  addToolbar(callback){
+    let toolbar = this.$page.get('#toolbar');
+    
+    if(!toolbar) {
+      toolbar =
+      <div
+        id='toolbar'
+        className='toolbar'>
+      </div>;
+      
+      saveBtn =
+      <span
+        id='saveBtn'
+        className='icon save'>
+      </span>;
+      toolbar.append(saveBtn);
+      
+      this.$page.header.append(toolbar);
+    }
+
+    let saveBtn = toolbar.get('#saveBtn');
+    saveBtn.addEventListener("click", callback, false);
   }
 
   showMsg(msg) {
