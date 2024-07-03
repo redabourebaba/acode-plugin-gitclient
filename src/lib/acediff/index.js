@@ -23,6 +23,7 @@ const C = require('./constants');
 
 // Range module placeholder
 let Range;
+let scrollSynchronized = true;
 
 function getRangeModule(ace) {
   if (ace.Range) {
@@ -38,14 +39,18 @@ function getRangeModule(ace) {
 }
 
 // our constructor
-function AceDiff(options = {}) {
+function AceDiff(options = {}, saveCallback) {
   // Ensure instance is a constructor with `new`
   if (!(this instanceof AceDiff)) {
-    return new AceDiff(options);
+    return new AceDiff(options, saveCallback);
   }
 
   // Current instance we pass around to other functions
   const acediff = this;
+  acediff.saveCallback = saveCallback;
+  
+  acediff.currentRevisionPos = -1;
+  
   const getDefaultAce = () => (window ? window.ace : undefined);
 
   acediff.options = merge({
@@ -60,26 +65,38 @@ function AceDiff(options = {}) {
     maxDiffs: 5000,
     left: {
       id: null,
+      path: null,
       content: null,
       mode: null,
       theme: null,
       editable: true,
       copyLinkEnabled: true,
+      mask: {
+        id: null
+      }
     },
     right: {
       id: null,
+      path: null,
       content: null,
       mode: null,
       theme: null,
       editable: true,
       copyLinkEnabled: true,
+      mask: {
+        id: null
+      }
     },
     classes: {
+      headerID: 'acediff__header',
       gutterID: 'acediff__gutter',
       diff: 'acediff__diffLine',
+      diffCurrent: 'acediff__diffLineCurrent',
       connector: 'acediff__connector',
+      connectorCurrent: 'acediff__connectorCurrent',
       newCodeConnectorLink: 'acediff__newCodeConnector',
       newCodeConnectorLinkContent: '&#8594;',
+      // newCodeConnectorLinkContent: '&#171;',
       deletedCodeConnectorLink: 'acediff__deletedCodeConnector',
       deletedCodeConnectorLinkContent: '&#8592;',
       copyRightContainer: 'acediff__copy--right',
@@ -121,9 +138,39 @@ function AceDiff(options = {}) {
     return new Error(errMessage);
   }
 
-  acediff.options.left.id = ensureElement(acediff.el, 'acediff__left');
-  acediff.options.classes.gutterID = ensureElement(acediff.el, 'acediff__gutter');
-  acediff.options.right.id = ensureElement(acediff.el, 'acediff__right');
+  createHeader(acediff);
+  
+  acediff.options.classes.contentID = ensureElement(acediff.el, 'acediff__content');
+
+  let contentEl = document.getElementById(acediff.options.classes.contentID);
+
+  acediff.options.left.mask.id = ensureElement(contentEl, 'acediff__left_mask');
+  acediff.options.left.mask.el = document.getElementById(acediff.options.left.mask.id);
+  
+  acediff.options.left.mask.el.pId = ensureElement(acediff.options.left.mask.el, acediff.options.left.id + '_p', 'p');
+  acediff.options.left.mask.el.p = document.getElementById(acediff.options.left.mask.el.pId);
+  acediff.options.left.mask.el.p.textContent = '⟩';
+       
+  acediff.options.left.id = ensureElement(contentEl, 'acediff__left');
+  acediff.options.left.el = document.getElementById(acediff.options.left.id);
+  
+  acediff.options.classes.gutterID = ensureElement(contentEl, 'acediff__gutter');
+  acediff.options.gutterEl = document.getElementById(acediff.options.classes.gutterID);
+  
+  acediff.options.right.id = ensureElement(contentEl, 'acediff__right');
+  acediff.options.right.el = document.getElementById(acediff.options.right.id);
+
+  acediff.options.right.mask.id = ensureElement(contentEl, 'acediff__right_mask');
+  acediff.options.right.mask.el = document.getElementById(acediff.options.right.mask.id);
+  acediff.options.right.mask.el.pId = ensureElement(acediff.options.right.mask.el, acediff.options.right.id + '_p', 'p');
+  acediff.options.right.mask.el.p = document.getElementById(acediff.options.right.mask.el.pId);
+  acediff.options.right.mask.el.p.textContent = '⟨';
+  
+  acediff.options.left.mask.el.classList.add('hidden');
+  acediff.options.left.el.classList.add('visible');
+  acediff.options.gutterEl.classList.add('visible');
+  acediff.options.right.el.classList.add('visible');
+  acediff.options.right.mask.el.classList.add('hidden');
 
   acediff.el.innerHTML = `<div class="acediff__wrap">${acediff.el.innerHTML}</div>`;
 
@@ -276,8 +323,8 @@ AceDiff.prototype = {
 let removeEventHandlers = () => { };
 
 function addEventHandlers(acediff) {
-  acediff.editors.left.ace.getSession().on('changeScrollTop', throttle(() => { updateGap(acediff); }, 16));
-  acediff.editors.right.ace.getSession().on('changeScrollTop', throttle(() => { updateGap(acediff); }, 16));
+  acediff.editors.left.ace.getSession().on('changeScrollTop', throttle(() => { updateGap(acediff, acediff.editors.left, acediff.editors.right); }, 16));
+  acediff.editors.right.ace.getSession().on('changeScrollTop', throttle(() => { updateGap(acediff, acediff.editors.right, acediff.editors.left); }, 16));
 
   const diff = acediff.diff.bind(acediff);
   acediff.editors.left.ace.on('change', diff);
@@ -285,17 +332,20 @@ function addEventHandlers(acediff) {
 
   if (acediff.options.left.copyLinkEnabled) {
     query.on(`#${acediff.options.classes.gutterID}`, 'click', `.${acediff.options.classes.newCodeConnectorLink}`, (e) => {
-      copy(acediff, e, C.LTR);
+      const diffIndex = parseInt(e.target.getAttribute('data-diff-index'), 10);
+	  copy(acediff, diffIndex, C.LTR);
     });
   }
+  
   if (acediff.options.right.copyLinkEnabled) {
     query.on(`#${acediff.options.classes.gutterID}`, 'click', `.${acediff.options.classes.deletedCodeConnectorLink}`, (e) => {
-      copy(acediff, e, C.RTL);
+      const diffIndex = parseInt(e.target.getAttribute('data-diff-index'), 10);
+	  copy(acediff, diffIndex, C.RTL);
     });
   }
 
   const onResize = debounce(() => {
-    acediff.editors.availableHeight = document.getElementById(acediff.options.left.id).offsetHeight;
+    acediff.editors.availableHeight = acediff.options.left.el.offsetHeight;
 
     // TODO this should re-init gutter
     acediff.diff();
@@ -305,11 +355,209 @@ function addEventHandlers(acediff) {
   removeEventHandlers = () => {
     window.removeEventListener('resize', onResize);
   };
+  
+  query.on('document', 'click', '#'+acediff.saveButtonId, (e) => {
+  	if(acediff.saveCallback){
+  	  acediff.saveCallback(acediff.options.right.path, acediff.editors.right.ace.getValue());
+  	}
+  });
+
+  query.on('document', 'click', '#'+acediff.nextButtonId, (e) => {
+	  goToNextRevision(acediff);
+  });
+
+  query.on('document', 'click', '#'+acediff.prevButtonId, (e) => {
+	  goToPreviousRevision(acediff);
+  });
+
+  query.on('document', 'click', '#'+acediff.rightToLeftButtonId, (e) => {
+	  rightToLeft(acediff);
+  });
+
+  query.on('document', 'click', '#'+acediff.leftToRightButtonId, (e) => {
+	  leftToRight(acediff);
+  });
+
+  query.on('document', 'click', '#'+acediff.syncScrollButtonId, (e) => {
+	  syncScroll(acediff);
+  });
+  
+  query.on('document', 'click', '#'+acediff.closeLeftEditorButtonId, (e) => {
+	 switchEditorVisibility(acediff, 'left');
+  });
+  
+  query.on('document', 'click', '#'+acediff.closeRightEditorButtonId, (e) => {
+	 switchEditorVisibility(acediff, 'right');
+	});
 }
 
+function switchEditorVisibility(acediff, side){
+  const leftButton = document.getElementById(acediff.closeLeftEditorButtonId);
+  const leftEditor = document.getElementById(acediff.options.left.id);
+  const leftMask = document.getElementById(acediff.options.left.mask.id);
+  
+  const rightButton = document.getElementById(acediff.closeRightEditorButtonId);
+  const rightEditor = document.getElementById(acediff.options.right.id);
+  const rightMask = document.getElementById(acediff.options.right.mask.id);
 
-function copy(acediff, e, dir) {
-  const diffIndex = parseInt(e.target.getAttribute('data-diff-index'), 10);
+  const gutter = document.getElementById(acediff.options.classes.gutterID);
+
+  if(side === 'left'){
+    if(leftEditor.classList.contains('hidden')){
+      showEditor(leftEditor, leftMask, gutter);
+      leftButton.textContent = '‹';
+    } else {
+      hideEditor(leftEditor, leftMask, gutter);
+      leftButton.textContent = '›';
+      
+      showEditor(rightEditor, rightMask);
+      rightButton.textContent = '›';
+    }
+  }
+  else {
+    if(rightEditor.classList.contains('hidden')){
+      showEditor(rightEditor, rightMask, gutter);
+      rightButton.textContent = '›';
+    } else {
+      hideEditor(rightEditor, rightMask, gutter);
+      rightButton.textContent = '‹';
+      
+      showEditor(leftEditor, leftMask);
+      leftButton.textContent = '‹';
+    }
+  }
+}
+
+function showEditor(editor, mask, gutter){
+  if(editor) editor.classList.replace('hidden', 'visible');
+  if(gutter) gutter.classList.replace('hidden', 'visible');
+  if(mask) {
+    mask.classList.replace('visible', 'hidden');
+  }
+}
+
+function hideEditor(editor, mask, gutter){
+  if(editor) editor.classList.replace('visible', 'hidden');
+  if(gutter) gutter.classList.replace('visible', 'hidden');
+  if(mask) mask.classList.replace('hidden', 'visible');
+}
+
+function syncScroll(acediff){
+  scrollSynchronized = !scrollSynchronized;
+  const syncScrollButton = document.getElementById(acediff.syncScrollButtonId);
+  
+	if(scrollSynchronized) {
+		syncScrollButton.classList.remove('inactive');
+	} else {
+		syncScrollButton.classList.add('inactive');
+	}
+}
+
+function leftToRight(acediff){
+	if(acediff.diffs.length > 0 && acediff.currentRevisionPos >= 0) {
+		copy(acediff, acediff.currentRevisionPos, C.LTR);
+		goToNextRevision(acediff);
+	}
+}
+
+function rightToLeft(acediff){
+	if(acediff.diffs.length > 0 && acediff.currentRevisionPos >= 0) {
+		copy(acediff, acediff.currentRevisionPos, C.RTL);
+		goToNextRevision(acediff);
+	}
+}
+
+function goToNextRevision(acediff){
+	if(acediff.diffs.length > 0) {
+		if(acediff.currentRevisionPos < acediff.diffs.length - 1) acediff.currentRevisionPos++;
+		else acediff.currentRevisionPos = 0;
+		
+		let revision = acediff.diffs[acediff.currentRevisionPos];
+
+		let rightStartLine = revision.rightStartLine;
+		let leftStartLine = revision.leftStartLine;
+
+		acediff.editors.right.ace.scrollToLine(rightStartLine, true, true, function () {});
+		acediff.editors.left.ace.scrollToLine(leftStartLine, true, true, function () {});
+
+		decorate(acediff);	
+	}	
+}
+
+function goToPreviousRevision(acediff){
+
+	if(acediff.diffs.length > 0) {
+	
+		if(acediff.currentRevisionPos > 0) acediff.currentRevisionPos--;
+		else acediff.currentRevisionPos = acediff.diffs.length - 1;
+		
+		let revision = acediff.diffs[acediff.currentRevisionPos];
+		
+		let nextRightLine = revision.rightStartLine;
+		let nextLeftLine = revision.leftStartLine;
+		
+		acediff.editors.right.ace.scrollToLine(nextRightLine, true, true, function () {});
+		acediff.editors.left.ace.scrollToLine(nextLeftLine, true, true, function () {});
+		
+		decorate(acediff);
+	}
+}
+
+function createHeader(acediff) {
+  acediff.options.classes.headerID = ensureElement(acediff.el, 'acediff__header');
+  
+  acediff.headerElement = document.getElementById(acediff.options.classes.headerID);
+  
+  acediff.leftMenuContainerId = ensureElement(acediff.headerElement, 'acediff__header_leftMenuContainer');
+  acediff.leftMenuContainer = document.getElementById(acediff.leftMenuContainerId);
+
+  acediff.centerMenuContainerId = ensureElement(acediff.headerElement, 'acediff__header_centerMenuContainer');
+  acediff.centerMenuContainer = document.getElementById(acediff.centerMenuContainerId);
+
+  acediff.rightMenuContainerId = ensureElement(acediff.headerElement, 'acediff__header_rightMenuContainer');
+  acediff.rightMenuContainer = document.getElementById(acediff.rightMenuContainerId);
+
+  acediff.closeLeftEditorButtonId = ensureElement(acediff.leftMenuContainer, 'acediff_action_closeLeftEditor', 'span');
+  acediff.closeLeftEditorButton = document.getElementById(acediff.closeLeftEditorButtonId);
+  acediff.closeLeftEditorButton.textContent = '‹';
+  acediff.closeLeftEditorButton.classList.add('side');
+
+  acediff.saveButtonId = ensureElement(acediff.centerMenuContainer, 'acediff_action_save', 'span');
+  acediff.saveButton = document.getElementById(acediff.saveButtonId);
+  acediff.saveButton.textContent = '💾';
+  
+  acediff.nextButtonId = ensureElement(acediff.centerMenuContainer, 'acediff_action_next', 'span');
+  acediff.nextButton = document.getElementById(acediff.nextButtonId);
+  acediff.nextButton.textContent = '↓';
+
+  acediff.prevButtonId = ensureElement(acediff.centerMenuContainer, 'acediff_action_previous', 'span');
+  acediff.prevButton = document.getElementById(acediff.prevButtonId);
+  acediff.prevButton.textContent = '↑';
+
+  if(acediff.options.right.copyLinkEnabled){
+    acediff.rightToLeftButtonId = ensureElement(acediff.centerMenuContainer, 'acediff_action_rightToLeft', 'span');
+    acediff.rightToLeftButton = document.getElementById(acediff.rightToLeftButtonId);
+    acediff.rightToLeftButton.textContent = "«";
+  }
+  
+  if(acediff.options.left.copyLinkEnabled){
+    acediff.leftToRightButtonId = ensureElement(acediff.centerMenuContainer, 'acediff_action_leftToRight', 'span');
+    acediff.leftToRightButton = document.getElementById(acediff.leftToRightButtonId);
+    acediff.leftToRightButton.textContent = '»';
+  }
+  
+  acediff.syncScrollButtonId = ensureElement(acediff.centerMenuContainer, 'acediff_action_syncScroll', 'span');
+  acediff.syncScrollButton = document.getElementById(acediff.syncScrollButtonId);
+  acediff.syncScrollButton.textContent = '↕↕';
+
+  acediff.closeRightEditorButtonId = ensureElement(acediff.rightMenuContainer, 'acediff_action_closeRightEditor', 'span');
+  acediff.closeRightEditorButton = document.getElementById(acediff.closeRightEditorButtonId);
+  acediff.closeRightEditorButton.textContent = '›';
+  acediff.closeRightEditorButton.classList.add('side');
+
+}
+
+function copy(acediff, diffIndex, dir) {
   const diff = acediff.diffs[diffIndex];
   let sourceEditor;
   let targetEditor;
@@ -359,31 +607,36 @@ function getLineLengths(editor) {
 
 
 // shows a diff in one of the two editors.
-function showDiff(acediff, editor, startLine, endLine, className) {
+function showDiff(acediff, editor, diffIndex, startLine, endLine, className) {
   const editorInstance = acediff.editors[editor];
 
   if (endLine < startLine) { // can this occur? Just in case.
     endLine = startLine;
   }
 
-  const classNames = `${className} ${(endLine > startLine) ? 'lines' : 'targetOnly'}`;
+  let classNames = `${className} ${(endLine > startLine) ? 'lines' : 'targetOnly'}`;
+  classNames = `${classNames} ${(diffIndex === acediff.currentRevisionPos) ? acediff.options.classes.diffCurrent : ''}`;
 
   // to get Ace to highlight the full row we just set the start and end chars to 0 and 1
-  editorInstance.markers.push(
-    editorInstance.ace.session.addMarker(
-      new Range(
-        startLine,
-        0,
-        endLine - 1 /* because endLine is always + 1 */,
-        1,
-      ), classNames, 'fullLine',
-    ),
+  editorInstance.markers[diffIndex] = editorInstance.ace.session.addMarker(
+	new Range(
+		startLine,
+		0,
+		endLine - 1 /* because endLine is always + 1 */,
+		1,
+	), classNames, 'fullLine',
   );
 }
 
 
 // called onscroll. Updates the gap to ensure the connectors are all lining up
-function updateGap(acediff) {
+function updateGap(acediff, editor1, editor2) {
+  
+  if(scrollSynchronized){
+    const h = editor1.ace.getSession().getScrollTop();
+    editor2.ace.getSession().setScrollTop(parseInt(h, 10));
+  }
+      
   clearDiffs(acediff);
   decorate(acediff);
 
@@ -402,7 +655,7 @@ function clearDiffs(acediff) {
 }
 
 
-function addConnector(acediff, leftStartLine, leftEndLine, rightStartLine, rightEndLine) {
+function addConnector(acediff, diffIndex, leftStartLine, leftEndLine, rightStartLine, rightEndLine) {
   const leftScrollTop = acediff.editors.left.ace.getSession().getScrollTop();
   const rightScrollTop = acediff.editors.right.ace.getSession().getScrollTop();
 
@@ -431,13 +684,16 @@ function addConnector(acediff, leftStartLine, leftEndLine, rightStartLine, right
 
   const el = document.createElementNS(C.SVG_NS, 'path');
   el.setAttribute('d', d);
-  el.setAttribute('class', acediff.options.classes.connector);
+  
+  let className = `${(diffIndex === acediff.currentRevisionPos) ? acediff.options.classes.connectorCurrent : acediff.options.classes.connector}`;
+  
+  el.setAttribute('class', className);
   acediff.gutterSVG.appendChild(el);
 }
 
 
 function addCopyArrows(acediff, info, diffIndex) {
-  if (info.leftEndLine > info.leftStartLine && acediff.options.left.copyLinkEnabled) {
+  if (acediff.options.left.copyLinkEnabled) {
     const arrow = createArrow({
       className: acediff.options.classes.newCodeConnectorLink,
       topOffset: info.leftStartLine * acediff.lineHeight,
@@ -448,7 +704,7 @@ function addCopyArrows(acediff, info, diffIndex) {
     acediff.copyRightContainer.appendChild(arrow);
   }
 
-  if (info.rightEndLine > info.rightStartLine && acediff.options.right.copyLinkEnabled) {
+  if (acediff.options.right.copyLinkEnabled) {
     const arrow = createArrow({
       className: acediff.options.classes.deletedCodeConnectorLink,
       topOffset: info.rightStartLine * acediff.lineHeight,
@@ -786,14 +1042,15 @@ function simplifyDiffs(acediff, diffs) {
 function decorate(acediff) {
   clearGutter(acediff);
   clearArrows(acediff);
+  clearDiffs(acediff);
 
   acediff.diffs.forEach((info, diffIndex) => {
     if (acediff.options.showDiffs) {
-      showDiff(acediff, C.EDITOR_LEFT, info.leftStartLine, info.leftEndLine, acediff.options.classes.diff);
-      showDiff(acediff, C.EDITOR_RIGHT, info.rightStartLine, info.rightEndLine, acediff.options.classes.diff);
+      showDiff(acediff, C.EDITOR_LEFT, diffIndex, info.leftStartLine, info.leftEndLine, acediff.options.classes.diff);
+      showDiff(acediff, C.EDITOR_RIGHT, diffIndex, info.rightStartLine, info.rightEndLine, acediff.options.classes.diff);
 
       if (acediff.options.showConnectors) {
-        addConnector(acediff, info.leftStartLine, info.leftEndLine, info.rightStartLine, info.rightEndLine);
+        addConnector(acediff, diffIndex, info.leftStartLine, info.leftEndLine, info.rightStartLine, info.rightEndLine);
       }
       addCopyArrows(acediff, info, diffIndex);
     }

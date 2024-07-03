@@ -99,11 +99,11 @@ export class GitClientAcodePlugin {
     }
     
     const _self = this;
-    this.addToolbar((e) => {
-      _self.showMsg("click")
+    // this.addToolbar((e) => {
+      // _self.showMsg("click")
       // _self.saveLogsToFile();
       // _self.saveLogsToFile();
-    });
+    // });
     
     let logs = this.$page.get('#logs');
     if(!logs) {
@@ -127,10 +127,10 @@ export class GitClientAcodePlugin {
     }
     
     const _self = this;
-    this.addToolbar((e) => {
+    // this.addToolbar((e) => {
       // _self.saveLogsToFile();
-      _self.showMsg("click")
-    });
+      // _self.showMsg("click")
+    // });
     
     let diff = this.$page.get('#diff');
     if(!diff) {
@@ -139,6 +139,10 @@ export class GitClientAcodePlugin {
     } else {
       diff.replaceChildren();
     }
+    
+    // this.$page.on("hide", () => {
+    //   _self.showMsg("hide");
+    // });
     
     this.$page.show();
     
@@ -157,16 +161,22 @@ export class GitClientAcodePlugin {
       
       saveBtn =
       <span
-        id='saveBtn'
+        id="toolbarSaveBtn"
         className='icon save'>
       </span>;
       toolbar.append(saveBtn);
       
       this.$page.header.append(toolbar);
+      // saveBtn.addEventListener("click", callback);
     }
 
-    let saveBtn = toolbar.get('#saveBtn');
-    saveBtn.addEventListener("click", callback, false);
+    // query.on('document', 'click', '#'+acediff.closeLeftEditorButtonId, (e) => {
+	   // switchEditorVisibility(acediff, 'left');
+    // });
+    
+    // let saveBtn = document.querySelector('#toolbarSaveBtn');
+  
+    // let saveBtn = toolbar.get('#saveBtn');
   }
 
   showMsg(msg) {

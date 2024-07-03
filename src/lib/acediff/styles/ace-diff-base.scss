@@ -1,10 +1,11 @@
-.acediff { // .acediff class itself got no styles
+.acediff {
+  // .acediff class itself got no styles
 
   // We have to provide some dimensions for the ACE editor
   // This will expand to whathever space is available
   &__wrap {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     position: absolute;
     bottom: 0;
     width: 100%;
@@ -17,8 +18,63 @@
     overflow: auto;
   }
 
+  &__header {
+    width: 100%;
+    height:40px;
+    background-color: $headerBackground;
+    border-bottom: 1px solid darken($headerBackground, 20);
+    display: flex;
+    flex-direction: row;
+
+    &_leftMenuContainer {
+      flex: 0 0 34px;
+      text-align: left;
+    }
+    
+    &_centerMenuContainer {
+      flex: 1;
+      text-align: center;
+    }
+    
+    &_rightMenuContainer {
+      flex: 0 0 34px;
+      text-align: right;
+    }
+    
+    span {
+      background-color: darken($headerBackground, 20);
+      border: 1px solid #f8f9fa;
+      border-radius: 4px;
+      color: #3c4043;
+      font-family: arial, sans-serif;
+      font-size: 20px;
+      width: 30px;
+      height: 30px;
+      min-width: 30px;
+      max-width: 30px;
+      padding: 2px;
+      text-align: center;
+      display: inline-block;
+      
+      &.inactive {
+        background-color: $headerBackground;
+      }
+      
+      &.side {
+        width: 20px;
+      }
+    }
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+    background-color: $contentBackground;
+  }
+
   &__gutter {
-    flex: 0 0 60px;
     border-left: 1px solid darken($gutterBackground, 20);
     border-right: 1px solid darken($gutterBackground, 20);
     background-color: $gutterBackground;
@@ -27,10 +83,46 @@
     svg {
       background-color: $gutterBackground;
     }
+    
+    &.visible {
+      flex: 0 0 60px;
+    }
+  
+    &.hidden {
+      flex: 0;
+    }
   }
   &__left, &__right {
     height: 100%;
-    flex: 1;
+    
+    &.visible {
+      flex: 1;
+    }
+  
+    &.hidden {
+      flex: 0
+    }
+  }
+  
+  &__left_mask, &__right_mask {
+    height: 100%;
+    border-left: 1px solid darken($gutterBackground, 20);
+    border-right: 1px solid darken($gutterBackground, 20);
+    background-color: $gutterBackground;
+    color: #3c4043;
+    
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    
+    &.visible {
+      flex: 0 0 20px;
+    }
+    
+    &.hidden {
+      flex: 0 0 0;
+      min-width: 0;
+    }
   }
 
   // The line that's rendered in ACE editor under diffed lines
@@ -48,10 +140,30 @@
     }
   }
 
+  // The line that's rendered in ACE editor under diffed lines, current line
+  &__diffLineCurrent {
+    background-color: $connectorBackgroundCurrent;
+    border-top: 1px solid $connectorBorderCurrent;
+    border-bottom: 1px solid $connectorBorderCurrent;
+    position: absolute;
+    z-index: 4;
+    &.targetOnly {
+      height: 0px !important;
+      border-top: 1px solid $connectorBorderCurrent;
+      border-bottom: 0px;
+      position: absolute;
+    }
+  }
+
   // SVG connector
   &__connector {
     fill: $connectorBackground;
     stroke: $connectorBorder;
+  }
+
+  &__connectorCurrent {
+    fill: $connectorBackgroundCurrent;
+    stroke: $connectorBorderCurrent;
   }
 
   // Arrows for merging diffs
@@ -83,4 +195,3 @@
     }
   }
 }
-

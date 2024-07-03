@@ -28,7 +28,6 @@ export default class FsWrapper {
   async readFile(path, options = {}) {
     this.loginfo('readFile start : ' + path);
 
-    // if (await this.exists(path)) {
     try{
       let result;
       if (options.encoding) {
@@ -39,7 +38,6 @@ export default class FsWrapper {
       // await this.loginfo('readfile result : ' + result);
       this.loginfo('readfile end : ' + path + ' success');
       return result
-    // } else {
     } catch(err){
       const msg = 'readFile error : ' + path + ' not found';
       this.logerror(msg);

@@ -1,8 +1,14 @@
 $connectorBackground: #d8f2ff;
 $connectorBorder: #a2d7f2;
 $gutterBackground: #efefef;
+$headerBackground: #efefef;
+$contentBackground: #efefef;
 $copyArrowsColor: #000;
 $mergeRightColor: #c98100;
 $mergeLeftColor: #004ea0;
+
+$connectorBackgroundCurrent: #80d4ff;
+/* $connectorBackgroundCurrent: #ff0000; */
+$connectorBorderCurrent: #44afe4;
 
 @import './ace-diff-base.scss';

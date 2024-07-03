@@ -201,11 +201,12 @@ export async function gitFetch(_fs, _dir, _http, _ref, _onAuth, _onAuthSuccess, 
   });
 }
 
-export async function gitStatusMatrix(_fs, _dir, _filter) {
+export async function gitStatusMatrix(_fs, _dir, _filter, _callback) {
   return await git.statusMatrix({
     fs: _fs,
     dir: _dir,
-    filter: _filter
+    filter: _filter,
+    callback: _callback
   });
 }
 

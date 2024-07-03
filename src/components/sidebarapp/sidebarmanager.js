@@ -27,7 +27,6 @@ import collapsableList from '../collapsableList';
 import tile from '../tile';
 import Checkbox from '../checkbox';
 import http from 'isomorphic-git/http/web/index.js'
-// import AceDiff from '../../lib/acediff/index.js';
 
 /** @type {HTMLElement} */
 let $container = null;
@@ -45,6 +44,7 @@ let $unstagedItemsSelected = [];
 let $untrackedItemsSelected = [];
 
 let $selectActionList = null;
+let differ = null;
 
 const confirm = acode.require('confirm');
 const alert = acode.require('alert');
@@ -581,30 +581,33 @@ export class SideBarManager {
         this.startLoading($unstagedCollapsableList);
         this.startLoading($untrackedCollapsableList);
         
-        let diffs = await gitStatusMatrix(fs, gitDir);
+        $stagedItems = [];
+        $untrackedItems = [];
+        $unstagedItems = [];
         
         $stagedCollapsableList.$ul.replaceChildren();
         $unstagedCollapsableList.$ul.replaceChildren();
         $untrackedCollapsableList.$ul.replaceChildren();
         
+        let diffs = await gitStatusMatrix(fs, gitDir, null, (diff) => {
+          if(this.getDiffStatusMess(diff) !== 'unmodified'){
+            if(this.isStaged(diff)){
+              this.appendList($stagedCollapsableList, $stagedItemsSelected, diff);
+              $stagedItems.push(diff);
+              $stagedCollapsableList.$title.text = `Staged changes (${$stagedItems.length})`;
+            } else if(this.isUntracked(diff)){
+              $untrackedItems.push(diff);
+              $untrackedCollapsableList.$title.text = `Untracked files(${$untrackedItems.length})`;
+              this.appendList($untrackedCollapsableList, $untrackedItemsSelected, diff);
+            } else {
+              $unstagedItems.push(diff);
+              $unstagedCollapsableList.$title.text = `Unstaged changes(${$unstagedItems.length})`;
+              this.appendList($unstagedCollapsableList, $unstagedItemsSelected, diff);
+            }
+          }
+        });
+
         if (diffs) {
-          // remove unmodified files
-          diffs = diffs.filter((o) => this.getDiffStatusMess(o) !== 'unmodified');
-          
-          $stagedItems = diffs.filter((o) => this.isStaged(o));
-          $untrackedItems = diffs.filter((o) => this.isUntracked(o));
-          $unstagedItems = diffs.filter((o) => !$stagedItems.includes(o) && !$untrackedItems.includes(o));
-          
-          $stagedCollapsableList.$title.text = `Staged changes (${$stagedItems.length})`;
-          this.fillList($stagedCollapsableList, $stagedItemsSelected, $stagedItems);
-
-          // unstaged files
-          $unstagedCollapsableList.$title.text = `Unstaged changes(${$unstagedItems.length})`;
-          this.fillList($unstagedCollapsableList, $unstagedItemsSelected, $unstagedItems);
-
-          // untracked files
-          $untrackedCollapsableList.$title.text = `Untracked files(${$untrackedItems.length})`;
-          this.fillList($untrackedCollapsableList, $untrackedItemsSelected, $untrackedItems);
         } else {
           $stagedCollapsableList.$ul.append(<span>No changes</span>);
           $unstagedCollapsableList.$ul.append(<span>No changes</span>);
@@ -630,6 +633,14 @@ export class SideBarManager {
     });
     
     list.$ul.content = newitems.map(this.ListItem);
+  }
+  
+  appendList(list, destList, item){
+    let newitem = {destList, _self: this, item};
+    // if(list.$ul.content === undefined) {
+    //   list.$ul.content = [];
+    // }
+    list.$ul.append(this.ListItem(newitem));
   }
   
   ListItem({ destList, _self, item }) {
@@ -830,6 +841,9 @@ export class SideBarManager {
     // _self.plug.showMsg('content');
     
     try {
+      
+      const _self = this;
+      
       const diffPage = this.plug.showDiffPage("Diff for " + filepath);
       
       const filesystem = this.getFilesystem();
@@ -851,18 +865,40 @@ export class SideBarManager {
       
       let AceDiff = require('../../lib/acediff/index');
       
-      const differ = new AceDiff({
+      if(differ !== null){
+        differ.destroy;
+        differ = null;
+      }
+      
+      differ = new AceDiff({
         element: diffPage,
         left: {
+          path: path,
           content: oldData,
+          editable: false
         },
         right: {
+          path: path,
           content: data,
+          copyLinkEnabled: false
         },
+      },
+      (path, content) => {
+        _self.saveContent(path, content);
       });
 
     } catch(err){
       this.plug.showMsg("showDiff error " + err);
+    }
+  }
+  
+  async saveContent(path, content){
+    try{
+      const filesystem = this.getFilesystem();
+      await filesystem.writeFile(path, content);
+      this.plug.showMsg(path + " saved");
+    } catch(err){
+      this.plug.showMsg("Error when trying to save " + path + ": " + err);
     }
   }
   

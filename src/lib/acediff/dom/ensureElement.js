@@ -5,7 +5,7 @@
  *
  * Returns ID of the element
  */
-module.exports = function ensureElement(parent, elClass) {
+module.exports = function ensureElement(parent, elClass, tagName) {
   const guid = Math.random().toString(36).substr(2, 5);
   const newId = `js-${elClass}-${guid}`;
 
@@ -14,8 +14,10 @@ module.exports = function ensureElement(parent, elClass) {
     currentEl.id = currentEl.id || newId;
     return currentEl.id;
   }
-
-  const el = document.createElement('div');
+  
+  if(tagName === undefined) tagName = 'div';
+  
+  const el = document.createElement(tagName);
   parent.appendChild(el);
   el.className = elClass;
   el.id = newId;

@@ -14009,6 +14009,7 @@ async function statusMatrix({
   filter,
   cache = {},
   ignored: shouldIgnore = false,
+  callback
 }) {
   try {
     assertParameter('fs', _fs);
@@ -14081,6 +14082,9 @@ async function statusMatrix({
         const entry = [undefined, headOid, workdirOid, stageOid];
         const result = entry.map(value => entry.indexOf(value));
         result.shift(); // remove leading undefined entry
+        
+        if(callback) callback([filepath, ...result]);
+        
         return [filepath, ...result]
       },
     })
