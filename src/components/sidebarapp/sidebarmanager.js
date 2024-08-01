@@ -45,6 +45,7 @@ let $untrackedItemsSelected = [];
 
 let $selectActionList = null;
 let differ = null;
+let refreshInProgress = false;
 
 const confirm = acode.require('confirm');
 const alert = acode.require('alert');
@@ -109,14 +110,12 @@ const onAuth = async function(url){
     let auth = await lookupSavedPassword(url);
   
     if (auth) {
-      // alert('Alert', 'onAuth look : **' + JSON.stringify(auth) + '**');
       auth.state = 'cache';
       return auth
     }
   
     if(await confirm('Confirm', 'This repo is password protected. Ready to enter a username & password?', true)){
       auth = await promptAuthInfo(url);
-      // alert('Alert', 'onAuth prompt : ' + JSON.stringify(auth));
       auth.state = 'new'
       return auth;
     } else {
@@ -224,22 +223,22 @@ export class SideBarManager {
     const _self = this;
     
     sidebarApps.add(
-    // icon
-    'git', 
-    // id
-    this.plug.appName, 
-    // title
-    'Git Client App',
-    // init function
-    (el) => {
-      _self.initApp(el);
-    },
-    // prepend
-    false,
-    // onSelected function
-    () => {
-      _self.refresh();
-    }
+      // icon
+      'git', 
+      // id
+      this.plug.appName, 
+      // title
+      'Git Client App',
+      // init function
+      (el) => {
+        _self.initApp(el);
+      },
+      // prepend
+      false,
+      // onSelected function
+      () => {
+        // on selected
+      }
     );
   }
   
@@ -247,16 +246,6 @@ export class SideBarManager {
     try {
       
       const _self = this;
-      
-      if (!$container) {
-        $container = el;
-        $container.classList.add('extensions');
-        $container.append($header);
-        this.setEventListeners();
-
-        // // this.setOnShow();
-        $container.append($files);
-      }
       
       if (!$stagedCollapsableList) {
         $stagedCollapsableList = collapsableList('Staged changes');
@@ -302,31 +291,20 @@ export class SideBarManager {
           _self.expandList($untrackedCollapsableList);
         };
       }
-  
+      
+      if (!$container) {
+        $container = el;
+        $container.classList.add('extensions');
+        $container.append($header);
+        this.setEventListeners();
+        $container.append($files);
+      }
     } catch(err) {
       this.plug.showMsg(err);
     }
   }
   
-  initList(){
-    let $list = collapsableList('Staged changes');
-    $stagedCollapsableList.classList.add('staged');
-    $stagedCollapsableList.$title.classList.add('title');
-    $files.append($stagedCollapsableList);
-    
-    $list.collapse = ()=> {
-      _self.collapseList($list);
-    };
-    
-    $list.expand = ()=> {
-      _self.expandList($list);
-    };
-    
-    return $list;
-  }
-  
   collapseList($list){
-
     if($list.expanded){
       $list.classList.add('hidden');
     }
@@ -428,8 +406,10 @@ export class SideBarManager {
   }
 
   async refresh() {
-    this.setBranches();
-    this.setChangedFiles();
+    if(!refreshInProgress){
+      this.setBranches();
+      this.setChangedFiles();
+    }
   }
   
   async log() {
@@ -565,8 +545,12 @@ export class SideBarManager {
   }
   
   async setChangedFiles(){
+    if(refreshInProgress) return;
 
     try {
+      
+      refreshInProgress = true;
+      
       let gitDir;
       try{
         gitDir = this.getCurrentGitdir();
@@ -588,6 +572,9 @@ export class SideBarManager {
         $stagedCollapsableList.$ul.replaceChildren();
         $unstagedCollapsableList.$ul.replaceChildren();
         $untrackedCollapsableList.$ul.replaceChildren();
+        $stagedCollapsableList.$title.text = 'Staged changes';
+        $untrackedCollapsableList.$title.text = 'Untracked files';
+        $unstagedCollapsableList.$title.text = 'Unstaged changes';
         
         let diffs = await gitStatusMatrix(fs, gitDir, null, (diff) => {
           if(this.getDiffStatusMess(diff) !== 'unmodified'){
@@ -620,6 +607,7 @@ export class SideBarManager {
       $untrackedCollapsableList.$ul.append(<span>Error loading changes</span>);
       this.plug.showMsg("setChangedFiles error : " + err);
     } finally {
+      refreshInProgress = false;
       this.stopLoading($stagedCollapsableList);
       this.stopLoading($unstagedCollapsableList);
       this.stopLoading($untrackedCollapsableList);
@@ -870,17 +858,22 @@ export class SideBarManager {
         differ = null;
       }
       
+      const modelist = ace.require('ace/ext/modelist');
+      const mode = modelist.getModeForPath(path).mode;
+      
       differ = new AceDiff({
         element: diffPage,
         left: {
           path: path,
           content: oldData,
-          editable: false
+          editable: false,
+          mode: mode
         },
         right: {
           path: path,
           content: data,
-          copyLinkEnabled: false
+          copyLinkEnabled: false,
+          mode: mode
         },
       },
       (path, content) => {
